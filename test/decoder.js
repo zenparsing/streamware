@@ -2,7 +2,7 @@ module FS from "node:fs";
 module Path from "node:path";
 
 import { File } from "afs";
-import { NodeStream, StringDecoder, Pipe } from "../src/main.js";
+import { NodeStream, StringDecoder, Pipe } from "../src/";
 
 export async function main() {
 
