@@ -114,7 +114,7 @@ async function write(input, inner) {
         }
     }
 
-    for (let buffer of input)
+    for async (let buffer of input)
         await wrap(done => inner.write(buffer, done));
 
     await wrap(done => inner.end(done));
