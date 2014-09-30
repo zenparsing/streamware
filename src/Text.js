@@ -170,25 +170,28 @@ class Decoder {
 }
 
 
-export async function *encodeText(input, encoding = "utf8") {
+export function encodeText(input, encoding = "utf8") {
 
-    let buffer = yield new Buffer(0);
+    return skipFirst(async function*() {
 
-    for async (let text of input) {
+        let buffer = yield new Buffer(0);
 
-        while (text) {
+        for async (let text of input) {
 
-            if (!buffer)
-                buffer = new Buffer(16 * 1024);
+            while (text) {
 
-            let len = buffer.write(text, 0, void 0, encoding);
+                if (!buffer)
+                    buffer = new Buffer(16 * 1024);
 
-            buffer = buffer.slice(0, len);
+                let len = buffer.write(text, 0, void 0, encoding);
 
-            text = text.slice(buffer.toString().length);
-            buffer = yield buffer;
+                buffer = buffer.slice(0, len);
+
+                text = text.slice(buffer.toString().length);
+                buffer = yield buffer;
+            }
         }
-    }
+    }());
 }
 
 
