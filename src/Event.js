@@ -8,11 +8,6 @@ function firstProp(obj, ...names) {
 }
 
 
-// TODO:  It would be useful to get a notification when the queue fills
-// up, so that we can slow down or pause the data source, if it supports
-// that kind of thing.
-
-
 export function listen(obj, eventName) {
 
     let add = firstProp(obj, "addEventListener", "addListener"),
@@ -27,9 +22,14 @@ export function listen(obj, eventName) {
 }
 
 
-export async function *readEvents(init) {
+// TODO:  As the queue approaches its maximum size, we should notify the
+// controller.  This will give the controller an opportunity to throttle the
+// output rate.  Will the controller have enough information to determine
+// the ideal rate?  It should be able to calculate the current consumption
+// rate, in principle
 
-    const MAX_QUEUE_LENGTH = 32;
+
+export async function *readEvents(init) {
 
     let nextReady = x => null,
         queue = [];
@@ -37,26 +37,33 @@ export async function *readEvents(init) {
     function pushEvent(evt) {
 
         // Maintain max queue length by discarding the oldest event
-        if (queue.push(evt) > MAX_QUEUE_LENGTH)
+        if (queue.push(evt) > maxQueueLength)
             queue.shift();
 
         // Notify generator that event is ready
         nextReady();
+
+        return queue.length;
     }
 
-    let { start, stop } = init(pushEvent);
+    let { start, stop, maxQueueLength = 32 } = init(pushEvent);
 
     start();
 
-    while (true) {
+    try {
 
-        // Yield all queued events
-        while (queue.length > 0)
-            yield queue.shift();
+        while (true) {
 
-        // Wait for a new event to arrive
-        await new Promise(accept => nextReady = accept);
+            // Yield all queued events
+            while (queue.length > 0)
+                yield queue.shift();
+
+            // Wait for a new event to arrive
+            await new Promise(accept => nextReady = accept);
+        }
+
+    } finally {
+
+        stop();
     }
-
-    stop();
 }
