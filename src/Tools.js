@@ -79,20 +79,17 @@ export function intercept(iter, interceptor) {
 
 
 // Returns an iterator which maps values from the input iterator
-export function map(iter, fn) {
+export async function *map(iter, fn) {
 
-    return intercept(iter, {
+    for async (let value of iter)
+        yield await fn(value);
+}
 
-        async next(value) {
 
-            let result = await iter.next(value);
+// Returns an iterator which executes a callback for each value in the sequence
+export function forEach(iter, fn) {
 
-            if (!result.done)
-                result.value = await fn(result.value);
-
-            return result;
-        }
-    });
+    return map(iter, async val => (await fn(val), val));
 }
 
 
@@ -352,4 +349,135 @@ export function asyncClass(F, ...methods) {
 
     for (let name of methods)
         F.prototype[name] = wrap(F.prototype[name]);
+}
+
+
+export async function *slice(input, start = 0, stop = Infinity) {
+
+    let current = 0;
+
+    if (current >= stop)
+        return;
+
+    for async (let chunk of input) {
+
+        if (current >= start)
+            yield chunk;
+
+        if (++current >= stop)
+            break;
+    }
+}
+
+
+export async function *noClose(iter) {
+
+    var iter = iterBase();
+    iter.next = val => input.next(val);
+    iter.throw = val => input.throw(val);
+    return iter;
+}
+
+
+// TODO:  As the queue approaches its maximum size, we should notify the
+// controller.  This will give the controller an opportunity to throttle the
+// output rate.  Will the controller have enough information to determine
+// the ideal rate?  It should be able to calculate the current consumption
+// rate, in principle
+
+
+export function pushSource(init) {
+
+    let nextReady = x => null,
+        queue = [],
+        closed = false;
+
+    async function *produce() {
+
+        try {
+
+
+
+        } finally {
+
+            closed = true;
+        }
+    }
+
+    async function *consume() {
+
+        while (true) {
+
+            // Yield all queued events
+            while (queue.length > 0) {
+
+                let item = queue.shift();
+                item.resolve();
+                yield item.value;
+            }
+
+            if (closed)
+                break;
+
+            // Wait for a new event to arrive
+            await new Promise(accept => nextReady = accept);
+        }
+    }
+
+    init(produce());
+    return consume();
+}
+
+
+export function sinkSource() {
+
+    let gate = new Gate,
+        done = false;
+
+    async function *producer() {
+
+        try {
+
+            while (!done) {
+
+                gate.open("ready", yield);
+                await gate.wait("done");
+                gate.close("done");
+            }
+
+        } finally {
+
+            gate.open("ready");
+            done = true;
+        }
+    }
+
+    async function *consumer() {
+
+        try {
+
+            while (true) {
+
+                let value = await gate.wait("ready");
+
+                if (done)
+                    break;
+
+                gate.close("ready");
+                gate.open("done");
+
+                yield value;
+            }
+
+        } finally {
+
+            gate.open("done");
+            done = true;
+        }
+    }
+
+    let sink = skipFirst(producer()),
+        source = consumer();
+
+    return { sink, source };
 }

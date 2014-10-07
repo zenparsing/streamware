@@ -5,7 +5,32 @@ import { buffer, skipFirst } from "./Tools.js";
 const DEFAULT_BUFFER_SIZE = 16 * 1024;
 
 
-export function readBytes(reader, maxBytes = Infinity) {
+export function readBytes(reader) {
+
+    return skipFirst(async function*() {
+
+        let chunk = yield new Buffer(0);
+
+        while (true) {
+
+            if (!chunk)
+                chunk = new Buffer(DEFAULT_BUFFER_SIZE);
+
+            let output = await reader.read(chunk);
+
+            if (!output)
+                break;
+
+            chunk = yield output;
+        }
+
+    }());
+}
+
+
+export function limitBytes(input, maxBytes) {
+
+    // TODO:  convert iterable > iterator?
 
     return skipFirst(async function*() {
 
@@ -19,13 +44,13 @@ export function readBytes(reader, maxBytes = Infinity) {
             if (maxBytes < chunk.length)
                 chunk = chunk.slice(0, maxBytes);
 
-            let output = await reader.read(chunk);
+            let result = await input.next(chunk);
 
-            if (!output)
-                break;
+            if (result.done)
+                return result.value;
 
             maxBytes -= chunk.length;
-            chunk = yield output;
+            chunk = yield result.value;
         }
 
     }());
@@ -125,8 +150,11 @@ export async function *fixedBytes(input, length) {
 
     for async (let chunk of input) {
 
-        if (leftover)
+        if (leftover) {
+
             chunk = Buffer.concat(leftover, chunk);
+            leftover = null;
+        }
 
         while (chunk.length >= length) {
 
@@ -139,30 +167,4 @@ export async function *fixedBytes(input, length) {
 
     if (leftover)
         yield leftover;
-}
-
-
-export async function *limitBytes(input, limit) {
-
-    if (typeof input.push !== "function")
-        throw new TypeError("Not a push back iterator");
-
-    if (limit <= 0)
-        return;
-
-    for async (let chunk of input) {
-
-        if (chunk.length > limit) {
-
-            input.push(chunk.slice(limit));
-            chunk = chunk.slice(0, limit);
-        }
-
-        limit -= chunk.length;
-        yield chunk;
-
-        if (limit === 0)
-            break;
-    }
-
 }
