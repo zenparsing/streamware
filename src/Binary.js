@@ -30,7 +30,7 @@ export function readBytes(reader) {
 
 export function limitBytes(input, maxBytes) {
 
-    // TODO:  convert iterable > iterator?
+    input = input[Symbol.asyncIterator]();
 
     return skipFirst(async function*() {
 
@@ -54,13 +54,6 @@ export function limitBytes(input, maxBytes) {
         }
 
     }());
-}
-
-
-export async function writeBytes(input, writer) {
-
-    for async (let chunk of input)
-        writer.write(chunk);
 }
 
 

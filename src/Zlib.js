@@ -1,4 +1,6 @@
 import { transformBytes } from "./Binary.js";
+import { skipFirst, injectFirst } from "./Tools.js";
+import { mutex } from "./Primatives.js";
 
 
 var Z = process.binding("zlib");
@@ -22,17 +24,14 @@ class ZLib {
 
     close() {
 
-        if (!this.zlib)
-            throw new Error("zlib closed");
+        if (this.zlib) {
 
-        this.zlib.close();
-        this.zlib = null;
+            this.zlib.close();
+            this.zlib = null;
+        }
     }
 
     async transform(input, output, offset, ending) {
-
-        if (this.request)
-            throw new Error("zlib write in progress");
 
         if (!this.zlib)
             throw new Error("zlib closed");
@@ -55,7 +54,7 @@ class ZLib {
                     req;
 
                 // Send a write command to zlib
-                this.request = this.zlib.write(
+                req = this.zlib.write(
                     ending ? Z.Z_FINISH : Z.Z_NO_FLUSH,
                     input,
                     inOffset,
@@ -64,9 +63,9 @@ class ZLib {
                     outOffset,
                     outLength);
 
-                this.request.buffer = input;
+                req.buffer = input;
 
-                this.request.callback = (inLeft, outLeft) => accept([
+                req.callback = (inLeft, outLeft) => accept([
 
                     inLength - inLeft,
                     outLength - outLeft,
@@ -76,27 +75,39 @@ class ZLib {
 
         } finally {
 
-            this.zlib.onerror = null;
-            this.request = null;
+            if (this.zlib)
+                this.zlib.onerror = null;
         }
-
     }
 
 }
 
 
-async function *zStream(input, mode, options) {
+function zStream(input, mode, options) {
 
-    let zlib = new ZLib(mode, options);
+    return skipFirst(async function*() {
 
-    try {
+        let value = yield void 0,
+            zlib = new ZLib(mode, options),
+            inner = transformBytes(input, zlib);
 
-        return yield * transformBytes(input, zlib);
+        try {
 
-    } finally {
+            while (true) {
 
-        zlib.close();
-    }
+                let next = await inner.next(value);
+
+                value = next.value;
+
+                if (next.done)
+                    return value;
+
+                value = yield value;
+            }
+
+        } finally { zlib.close() }
+
+    }());
 }
 
 

@@ -1,9 +1,23 @@
 import { Gate } from "./Primatives.js";
 
 
-function iterBase() {
+function wrapIter(iter, overrides) {
 
-    return { [Symbol.asyncIterator]() { return this } };
+    let wrap = { [Symbol.asyncIterator]() { return this } };
+
+    Object.keys(overrides).forEach(name => {
+
+        if (name in iter)
+            wrap[name] = overrides[name];
+    });
+
+    ["next", "throw", "return"].forEach(name => {
+
+        if (!(name in wrap))
+            wrap[name] = function() { return iter[name].apply(arguments) };
+    });
+
+    return wrap;
 }
 
 
@@ -15,69 +29,6 @@ export function skipFirst(iter) {
 }
 
 
-// Returns an async iterator from the specified iterator
-export function asyncIter(iter) {
-
-    let queue = [], state = "paused";
-
-    function enqueue(type, value) {
-
-        let accept,
-            reject,
-            promise = new Promise((a, r) => (accept = a, reject = r));
-
-        queue.push({ type, value, accept, reject });
-
-        if (state === "paused")
-            flush();
-
-        return promise;
-    }
-
-    async function flush() {
-
-        state = "running";
-
-        while (queue.length > 0) {
-
-            let next = queue.shift();
-
-            try { next.accept(await iter[next.type](next.value)) }
-            catch (x) { next.reject(x) }
-        }
-
-        state = "paused";
-    }
-
-    let aIter = iterBase();
-
-    if ("next" in iter) aIter.next = val => enqueue("next", val);
-    if ("throw" in iter) aIter.throw = val => enqueue("throw", val);
-    if ("return" in iter) aIter.return = val => enqueue("return", val);
-
-    return aIter;
-}
-
-
-// Returns an iterator which intercepts method calls to the input iterator
-export function intercept(iter, interceptor) {
-
-    let obj = iterBase();
-
-    for (let name of ["next", "throw", "return"]) {
-
-        if (!(name in iter))
-            continue;
-
-        obj[name] = name in interceptor ?
-            x => interceptor[name](x) :
-            x => iter[name](x);
-    }
-
-    return asyncIter(obj);
-}
-
-
 // Returns an iterator which maps values from the input iterator
 export async function *map(iter, fn) {
 
@@ -86,30 +37,50 @@ export async function *map(iter, fn) {
 }
 
 
+export function mapInput(iter, fn) {
+
+    return wrapIter(iter, {
+
+        next(value) { return iter.next(fn(value)) }
+    });
+}
+
+
+export function injectFirst(iter, value) {
+
+    let first = true;
+
+    return wrapIter(iter, {
+
+        next(v) {
+
+            if (first) {
+
+                first = false;
+                v = value;
+            }
+
+            return iter.next(v);
+        }
+    });
+}
+
+
 // Returns an iterator which executes a callback for each value in the sequence
-export function forEach(iter, fn) {
+export async function forEach(iter, fn) {
 
-    return map(iter, async val => (await fn(val), val));
+    for async (let value of iter)
+        await fn(val);
 }
 
 
-// Composes a list of streams
-export function compose(list) {
+// Composes a stream with a list of filters
+export function compose(input, list) {
 
-    return function(input) {
+    for (let fn of list)
+        input = fn(input);
 
-        for (let fn of list)
-            input = fn(input);
-
-        return input;
-    };
-}
-
-
-// Composes a list of streams and executes the composition
-export function pipe(list) {
-
-    return compose(list)();
+    return input;
 }
 
 
@@ -215,143 +186,6 @@ export async function *buffer(input, options = {}) {
 }
 
 
-// Wraps an iterator with push-back capabilities
-export function pushBack(input) {
-
-    if (typeof input.push === "function")
-        return input;
-
-    let stack = [], done = false;
-
-    let iter = intercept(input, {
-
-        async next(val) {
-
-            if (!done && stack.length > 0)
-                return { value: stack.pop(), done: false };
-
-            let result = await input.next(val);
-
-            if (result.done)
-                done = true;
-
-            return result;
-        }
-    });
-
-    iter.push = value => void stack.push(value);
-
-    return iter;
-}
-
-
-// Wraps an iterator with an iterator that only has a "next" method
-export function nextOnly(iter) {
-
-    return { next(value) { return iter.next(value) } };
-}
-
-
-export function mutexMethods(obj, ...names) {
-
-    const QUEUE = Symbol();
-
-    function wrap(fn) {
-
-        return function(...args) {
-
-            let queue = this[QUEUE];
-
-            if (!queue) {
-
-                queue = this[QUEUE] = [];
-                queue.state = "paused";
-            }
-
-            let accept,
-                reject,
-                promise = new Promise((a, r) => (accept = a, reject = r));
-
-            queue.push({ fn, args, accept, reject });
-
-            if (queue.state === "paused")
-                flush(this, queue);
-
-            return promise;
-        };
-    }
-
-    async function flush(obj, queue) {
-
-        queue.state = "running";
-
-        while (queue.length > 0) {
-
-            let next = queue.shift();
-
-            try { next.accept(await next.fn.apply(obj, next.args)) }
-            catch (x) { next.reject(x) }
-        }
-
-        queue.state = "paused";
-    }
-
-    for (let name of names)
-        obj[name] = wrap(obj[name]);
-
-    return obj;
-}
-
-
-export function asyncClass(F, ...methods) {
-
-    const QUEUE = Symbol();
-
-    function wrap(fn) {
-
-        return function(...args) {
-
-            let queue = this[QUEUE];
-
-            if (!queue) {
-
-                queue = this[QUEUE] = [];
-                queue.state = "paused";
-            }
-
-            let accept,
-                reject,
-                promise = new Promise((a, r) => (accept = a, reject = r));
-
-            queue.push({ fn, args, accept, reject });
-
-            if (queue.state === "paused")
-                flush(this, queue);
-
-            return promise;
-        };
-    }
-
-    async function flush(obj, queue) {
-
-        queue.state = "running";
-
-        while (queue.length > 0) {
-
-            let next = queue.shift();
-
-            try { next.accept(await next.fn.apply(obj, next.args)) }
-            catch (x) { next.reject(x) }
-        }
-
-        queue.state = "paused";
-    }
-
-    for (let name of methods)
-        F.prototype[name] = wrap(F.prototype[name]);
-}
-
-
 export async function *slice(input, start = 0, stop = Infinity) {
 
     let current = 0;
@@ -379,66 +213,16 @@ export async function *noClose(iter) {
 }
 
 
-// TODO:  As the queue approaches its maximum size, we should notify the
-// controller.  This will give the controller an opportunity to throttle the
-// output rate.  Will the controller have enough information to determine
-// the ideal rate?  It should be able to calculate the current consumption
-// rate, in principle
-
-
-export function pushSource(init) {
-
-    let nextReady = x => null,
-        queue = [],
-        closed = false;
-
-    async function *produce() {
-
-        try {
-
-
-
-        } finally {
-
-            closed = true;
-        }
-    }
-
-    async function *consume() {
-
-        while (true) {
-
-            // Yield all queued events
-            while (queue.length > 0) {
-
-                let item = queue.shift();
-                item.resolve();
-                yield item.value;
-            }
-
-            if (closed)
-                break;
-
-            // Wait for a new event to arrive
-            await new Promise(accept => nextReady = accept);
-        }
-    }
-
-    init(produce());
-    return consume();
-}
-
-
 export function sinkSource() {
 
     let gate = new Gate,
-        done = false;
+        closed = false;
 
     async function *producer() {
 
         try {
 
-            while (!done) {
+            while (!closed) {
 
                 gate.open("ready", yield);
                 await gate.wait("done");
@@ -447,8 +231,8 @@ export function sinkSource() {
 
         } finally {
 
+            closed = true;
             gate.open("ready");
-            done = true;
         }
     }
 
@@ -460,7 +244,7 @@ export function sinkSource() {
 
                 let value = await gate.wait("ready");
 
-                if (done)
+                if (closed)
                     break;
 
                 gate.close("ready");
@@ -471,8 +255,8 @@ export function sinkSource() {
 
         } finally {
 
+            closed = true;
             gate.open("done");
-            done = true;
         }
     }
 
@@ -480,4 +264,18 @@ export function sinkSource() {
         source = consumer();
 
     return { sink, source };
+}
+
+
+export async function transfer(input, output) {
+
+    try {
+
+        for async (let value of input)
+            output.next(value);
+
+    } finally {
+
+        output.return();
+    }
 }

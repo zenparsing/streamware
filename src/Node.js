@@ -86,11 +86,12 @@ async function *read(inner) {
 
 async function *transform(input, inner) {
 
-    let writeDone = write(input),
-        value = yield * read(inner);
+    let writeDone = write(input);
+
+    for async (let value of read(inner))
+        yield value;
 
     await writeDone;
-    return value;
 }
 
 
