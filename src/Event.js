@@ -1,4 +1,4 @@
-import { pushSource } from "./Tools.js";
+import { sinkSource } from "./Tools.js";
 
 
 function firstProp(obj, ...names) {
@@ -11,16 +11,25 @@ function firstProp(obj, ...names) {
 }
 
 
-export function listen(obj, eventName) {
+export async function *listen(obj, eventName) {
 
     let add = firstProp(obj, "addEventListener", "addListener"),
         remove = firstProp(obj, "removeEventListener", "removeListener");
 
-    return pushSource(push => ({
+    let { sink, source } = sinkSource();
 
-        start() { obj[add](push) },
-        stop() { obj[remove](push) },
+    function push(event) { sink.next(event) }
 
-    }));
+    obj[add](push);
+
+    try {
+
+        for async (let event of source)
+            yield event;
+
+    } finally {
+
+        obj[remove](push);
+    }
 }
 

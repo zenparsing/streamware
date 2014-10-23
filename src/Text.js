@@ -1,3 +1,7 @@
+import { skipFirst } from "./Tools.js";
+
+const DEFAULT_BUFFER_SIZE = 16 * 1024;
+
 class Decoder {
 
     constructor(encoding = "utf8") {
@@ -174,14 +178,14 @@ export function encodeText(input, encoding = "utf8") {
 
     return skipFirst(async function*() {
 
-        let buffer = yield new Buffer(0);
+        let buffer = yield null;
 
         for async (let text of input) {
 
             while (text) {
 
                 if (!buffer)
-                    buffer = new Buffer(16 * 1024);
+                    buffer = new Buffer(DEFAULT_BUFFER_SIZE);
 
                 let len = buffer.write(text, 0, void 0, encoding);
 

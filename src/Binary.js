@@ -1,40 +1,17 @@
 import { Gate } from "./Primatives.js";
-import { buffer, skipFirst } from "./Tools.js";
+import { pump, skipFirst, asyncIter } from "./Tools.js";
 
 
 const DEFAULT_BUFFER_SIZE = 16 * 1024;
 
 
-export function readBytes(reader) {
-
-    return skipFirst(async function*() {
-
-        let chunk = yield new Buffer(0);
-
-        while (true) {
-
-            if (!chunk)
-                chunk = new Buffer(DEFAULT_BUFFER_SIZE);
-
-            let output = await reader.read(chunk);
-
-            if (!output)
-                break;
-
-            chunk = yield output;
-        }
-
-    }());
-}
-
-
 export function limitBytes(input, maxBytes) {
 
-    input = input[Symbol.asyncIterator]();
+    input = asyncIter(input);
 
     return skipFirst(async function*() {
 
-        let chunk = yield new Buffer(0);
+        let chunk = yield null;
 
         while (maxBytes > 0) {
 
@@ -51,6 +28,8 @@ export function limitBytes(input, maxBytes) {
 
             maxBytes -= chunk.length;
             chunk = yield result.value;
+
+            // TODO: close input if yield throws
         }
 
     }());
@@ -61,8 +40,8 @@ export function transformBytes(input, transformer) {
 
     return skipFirst(async function*() {
 
-        let emptyChunk = new Buffer(0),
-            output = yield emptyChunk,
+        let output = yield null,
+            emptyChunk = new Buffer(0),
             offset = 0;
 
         for async (let chunk of input) {
@@ -91,6 +70,9 @@ export function transformBytes(input, transformer) {
 
         while (true) {
 
+            if (!output)
+                output = new Buffer(DEFAULT_BUFFER_SIZE);
+
             // Flush the transform buffer
             let [ read, written ] = await transformer.transform(emptyChunk, output, offset, true);
             offset += written;
@@ -114,7 +96,7 @@ export function transformBytes(input, transformer) {
 }
 
 
-export function bufferBytes(input, options = {}) {
+export function pumpBytes(input, options = {}) {
 
     const defaultPool = {
 
@@ -133,31 +115,5 @@ export function bufferBytes(input, options = {}) {
         release: innerPool.release,
     };
 
-    return buffer(input, { min, max, pool });
-}
-
-
-export async function *fixedBytes(input, length) {
-
-    let leftover = null;
-
-    for async (let chunk of input) {
-
-        if (leftover) {
-
-            chunk = Buffer.concat(leftover, chunk);
-            leftover = null;
-        }
-
-        while (chunk.length >= length) {
-
-            yield chunk.slice(0, length);
-            chunk = chunk.slice(length);
-        }
-
-        leftover = chunk.length > 0 ? chunk : null;
-    }
-
-    if (leftover)
-        yield leftover;
+    return pump(input, { min, max, pool });
 }

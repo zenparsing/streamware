@@ -1,23 +1,23 @@
 import { Gate } from "./Primatives.js";
 
 
-function wrapIter(iter, overrides) {
+export function asyncIter(obj) {
 
-    let wrap = { [Symbol.asyncIterator]() { return this } };
+    if (obj[Symbol.asyncIterator] !== void 0)
+        return obj[Symbol.asyncIterator]();
 
-    Object.keys(overrides).forEach(name => {
+    // TODO: replace _es6now reference
 
-        if (name in iter)
-            wrap[name] = overrides[name];
-    });
+    var iter = { [Symbol.asyncIterator]() { return this } },
+        inner = _es6now.iter(obj);
 
     ["next", "throw", "return"].forEach(name => {
 
-        if (!(name in wrap))
-            wrap[name] = function() { return iter[name].apply(arguments) };
+        if (name in inner)
+            iter[name] = value => Promise.resolve(inner[name](value));
     });
 
-    return wrap;
+    return iter;
 }
 
 
@@ -34,35 +34,6 @@ export async function *map(iter, fn) {
 
     for async (let value of iter)
         yield await fn(value);
-}
-
-
-export function mapInput(iter, fn) {
-
-    return wrapIter(iter, {
-
-        next(value) { return iter.next(fn(value)) }
-    });
-}
-
-
-export function injectFirst(iter, value) {
-
-    let first = true;
-
-    return wrapIter(iter, {
-
-        next(v) {
-
-            if (first) {
-
-                first = false;
-                v = value;
-            }
-
-            return iter.next(v);
-        }
-    });
 }
 
 
@@ -85,7 +56,7 @@ export function compose(input, list) {
 
 
 // Returns an iterator which pumps and buffers the input iterator
-export async function *buffer(input, options = {}) {
+export async function *pump(input, options = {}) {
 
     const defaultPool = { allocate() {}, release() {} };
 
@@ -96,6 +67,7 @@ export async function *buffer(input, options = {}) {
         freeList = [],
         readyList = [],
         activeBuffer = null,
+        finished = false,
         gate = new Gate;
 
     // Allocate initial buffers
@@ -103,7 +75,7 @@ export async function *buffer(input, options = {}) {
         freeList[bufferCount++] = bufferPool.allocate();
 
     // Start pumping the input
-    pump();
+    consume();
 
     while (true) {
 
@@ -116,6 +88,7 @@ export async function *buffer(input, options = {}) {
 
             } else {
 
+                bufferCount -= 1;
                 bufferPool.release(activeBuffer);
             }
 
@@ -130,23 +103,31 @@ export async function *buffer(input, options = {}) {
 
         activeBuffer = next.buffer;
 
-        if (result.error)
-            throw result.error;
+        if (result.error) {
 
-        if (result.done)
+            finished = true;
+            throw result.error;
+        }
+
+        if (result.done) {
+
+            finished = true;
             return result.value;
+        }
 
         yield result.value;
+
+        // TODO:  Close input if yield throws?
     }
 
-    async function pump() {
+    async function consume() {
 
-        while (true) {
+        while (!finished) {
 
             // If free list is empty...
             if (freeList.length === 0) {
 
-                // If we can allocate a new buffer...
+                // If we have unused headroom...
                 if (bufferCount < maxBuffers) {
 
                     // Allocate a new buffer
@@ -180,7 +161,7 @@ export async function *buffer(input, options = {}) {
             gate.release("ready");
 
             if (result.done)
-                break;
+                finished = true;
         }
     }
 }
@@ -216,13 +197,13 @@ export async function *noClose(iter) {
 export function sinkSource() {
 
     let gate = new Gate,
-        closed = false;
+        finished = false;
 
     async function *producer() {
 
         try {
 
-            while (!closed) {
+            while (!finished) {
 
                 gate.open("ready", yield);
                 await gate.wait("done");
@@ -231,7 +212,7 @@ export function sinkSource() {
 
         } finally {
 
-            closed = true;
+            finished = true;
             gate.open("ready");
         }
     }
@@ -243,19 +224,18 @@ export function sinkSource() {
             while (true) {
 
                 let value = await gate.wait("ready");
+                gate.close("ready");
 
-                if (closed)
+                if (finished)
                     break;
 
-                gate.close("ready");
-                gate.open("done");
-
                 yield value;
+                gate.open("done");
             }
 
         } finally {
 
-            closed = true;
+            finished = true;
             gate.open("done");
         }
     }
@@ -272,10 +252,10 @@ export async function transfer(input, output) {
     try {
 
         for async (let value of input)
-            output.next(value);
+            await output.next(value);
 
     } finally {
 
-        output.return();
+        await output.return();
     }
 }

@@ -1,5 +1,5 @@
 import { transformBytes } from "./Binary.js";
-import { skipFirst, injectFirst } from "./Tools.js";
+import { skipFirst } from "./Tools.js";
 import { mutex } from "./Primatives.js";
 
 
