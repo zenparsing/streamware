@@ -174,9 +174,11 @@ class Decoder {
 }
 
 
-export function encodeText(input, encoding = "utf8") {
+export function encodeText(encoding = "utf8") {
 
-    return skipFirst(async function*() {
+    let input = this;
+
+    return async function*() {
 
         let buffer = yield null;
 
@@ -195,16 +197,17 @@ export function encodeText(input, encoding = "utf8") {
                 buffer = yield buffer;
             }
         }
-    }());
+
+    }()::skipFirst();
 }
 
 
-export async function *decodeText(input, encoding) {
+export async function *decodeText(encoding) {
 
     let decoder = new Decoder(encoding),
         text;
 
-    for async (let buffer of input) {
+    for async (let buffer of this) {
 
         text = decoder.decodeBuffer(buffer);
 
@@ -219,11 +222,11 @@ export async function *decodeText(input, encoding) {
 }
 
 
-export async function concatText(input) {
+export async function concatText() {
 
     let out = "";
 
-    for async (let text of input)
+    for async (let text of this)
         out += text;
 
     return out;

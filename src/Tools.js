@@ -1,15 +1,15 @@
 import { Gate } from "./Primatives.js";
 
 
-export function asyncIter(obj) {
+export function asyncIter() {
 
-    if (obj[Symbol.asyncIterator] !== void 0)
-        return obj[Symbol.asyncIterator]();
+    if (this[Symbol.asyncIterator] !== void 0)
+        return this[Symbol.asyncIterator]();
 
-    // TODO: replace _es6now reference
+    // TODO: replace _esdown reference
 
     var iter = { [Symbol.asyncIterator]() { return this } },
-        inner = _es6now.iter(obj);
+        inner = _esdown.iter(this);
 
     ["next", "throw", "return"].forEach(name => {
 
@@ -22,45 +22,36 @@ export function asyncIter(obj) {
 
 
 // Skips over an iteration and returns the iterator
-export function skipFirst(iter) {
+export function skipFirst() {
 
-    iter.next();
-    return iter;
+    this.next();
+    return this;
 }
 
 
 // Returns an iterator which maps values from the input iterator
-export async function *map(iter, fn) {
+export async function *map(fn) {
 
-    for async (let value of iter)
+    for async (let value of this)
         yield await fn(value);
 }
 
 
 // Returns an iterator which executes a callback for each value in the sequence
-export async function forEach(iter, fn) {
+export async function forEach(fn) {
 
-    for async (let value of iter)
+    for async (let value of this)
         await fn(val);
 }
 
 
-// Composes a stream with a list of filters
-export function compose(input, list) {
-
-    for (let fn of list)
-        input = fn(input);
-
-    return input;
-}
-
-
 // Returns an iterator which pumps and buffers the input iterator
-export async function *pump(input, options = {}) {
+export async function *pump(options = {}) {
 
     const defaultPool = { allocate() {}, release() {} };
 
-    let minBuffers = options.min >>> 0 || 1,
+    let input = this,
+        minBuffers = options.min >>> 0 || 1,
         maxBuffers = options.max >>> 0 || 16,
         bufferPool = options.pool || defaultPool,
         bufferCount = 0,
@@ -167,14 +158,14 @@ export async function *pump(input, options = {}) {
 }
 
 
-export async function *slice(input, start = 0, stop = Infinity) {
+export async function *slice(start = 0, stop = Infinity) {
 
     let current = 0;
 
     if (current >= stop)
         return;
 
-    for async (let chunk of input) {
+    for async (let chunk of this) {
 
         if (current >= start)
             yield chunk;
@@ -185,11 +176,11 @@ export async function *slice(input, start = 0, stop = Infinity) {
 }
 
 
-export async function *noClose(iter) {
+export async function *noClose() {
 
-    var iter = iterBase();
-    iter.next = val => input.next(val);
-    iter.throw = val => input.throw(val);
+    let iter = iterBase();
+    iter.next = val => this.next(val);
+    iter.throw = val => this.throw(val);
     return iter;
 }
 
@@ -240,18 +231,18 @@ export function sinkSource() {
         }
     }
 
-    let sink = skipFirst(producer()),
+    let sink = producer()::skipFirst(),
         source = consumer();
 
     return { sink, source };
 }
 
 
-export async function transfer(input, output) {
+export async function transfer(output) {
 
     try {
 
-        for async (let value of input)
+        for async (let value of this)
             await output.next(value);
 
     } finally {

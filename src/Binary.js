@@ -5,11 +5,11 @@ import { pump, skipFirst, asyncIter } from "./Tools.js";
 const DEFAULT_BUFFER_SIZE = 16 * 1024;
 
 
-export function limitBytes(input, maxBytes) {
+export function limitBytes(maxBytes) {
 
-    input = asyncIter(input);
+    let input = this::asyncIter();
 
-    return skipFirst(async function*() {
+    return async function*() {
 
         let chunk = yield null;
 
@@ -32,13 +32,15 @@ export function limitBytes(input, maxBytes) {
             // TODO: close input if yield throws
         }
 
-    }());
+    }()::skipFirst();
 }
 
 
-export function transformBytes(input, transformer) {
+export function transformBytes(transformer) {
 
-    return skipFirst(async function*() {
+    let input = this;
+
+    return async function*() {
 
         let output = yield null,
             emptyChunk = new Buffer(0),
@@ -92,11 +94,11 @@ export function transformBytes(input, transformer) {
             }
         }
 
-    }());
+    }()::skipFirst();
 }
 
 
-export function pumpBytes(input, options = {}) {
+export function pumpBytes(options = {}) {
 
     const defaultPool = {
 
@@ -115,5 +117,5 @@ export function pumpBytes(input, options = {}) {
         release: innerPool.release,
     };
 
-    return pump(input, { min, max, pool });
+    return this::pump({ min, max, pool });
 }

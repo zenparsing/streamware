@@ -85,11 +85,11 @@ class ZLib {
 
 function zStream(input, mode, options) {
 
-    return skipFirst(async function*() {
+    return async function*() {
 
         let value = yield void 0,
             zlib = new ZLib(mode, options),
-            inner = transformBytes(input, zlib);
+            inner = input::transformBytes(zlib);
 
         try {
 
@@ -107,41 +107,41 @@ function zStream(input, mode, options) {
 
         } finally { zlib.close() }
 
-    }());
+    }()::skipFirst();
 }
 
 
-export function deflate(input, options) {
+export function deflate(options) {
 
-    return zStream(input, Z.DEFLATE, options);
+    return zStream(this, Z.DEFLATE, options);
 }
 
 
-export function deflateRaw(input, options) {
+export function deflateRaw(options) {
 
-    return zStream(input, Z.DEFLATERAW, options);
+    return zStream(this, Z.DEFLATERAW, options);
 }
 
 
-export function inflate(input, options) {
+export function inflate(options) {
 
-    return zStream(input, Z.INFLATE, options);
+    return zStream(this, Z.INFLATE, options);
 }
 
 
-export function inflateRaw(input, options) {
+export function inflateRaw(options) {
 
-    return zStream(input, Z.INFLATERAW, options);
+    return zStream(this, Z.INFLATERAW, options);
 }
 
 
-export function gzip(input, options) {
+export function gzip(options) {
 
-    return zStream(input, Z.GZIP, options);
+    return zStream(this, Z.GZIP, options);
 }
 
 
-export function gunzip(input, options) {
+export function gunzip(options) {
 
-    return zStream(input, Z.GUNZIP, options);
+    return zStream(this, Z.GUNZIP, options);
 }
