@@ -20,7 +20,7 @@ export async function *listen(eventName) {
 
     function push(event) { sink.next(event) }
 
-    this[add](push);
+    this[add](eventName, push, false);
 
     try {
 
