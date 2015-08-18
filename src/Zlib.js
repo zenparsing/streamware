@@ -1,9 +1,9 @@
 import { transformBytes } from "./Binary.js";
-import { skipFirst } from "./Tools.js";
+import { skip } from "./Tools.js";
 import { mutex } from "./Primatives.js";
 
 
-var Z = process.binding("zlib");
+var Z = typeof process === "object" && process.binding("zlib");
 
 
 class ZLib {
@@ -107,7 +107,7 @@ function zStream(input, mode, options) {
 
         } finally { zlib.close() }
 
-    }()::skipFirst();
+    }()::skip();
 }
 
 

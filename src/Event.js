@@ -24,7 +24,7 @@ export async function *listen(eventName) {
 
     try {
 
-        for async (let event of source)
+        for await (let event of source)
             yield event;
 
     } finally {

@@ -1,5 +1,5 @@
 import { Gate } from "./Primatives.js";
-import { pump, skipFirst, asyncIter } from "./Tools.js";
+import { pump, skip, asyncIter } from "./Tools.js";
 
 
 const DEFAULT_BUFFER_SIZE = 16 * 1024;
@@ -32,7 +32,7 @@ export function limitBytes(maxBytes) {
             // TODO: close input if yield throws
         }
 
-    }()::skipFirst();
+    }()::skip();
 }
 
 
@@ -46,7 +46,7 @@ export function transformBytes(transformer) {
             emptyChunk = new Buffer(0),
             offset = 0;
 
-        for async (let chunk of input) {
+        for await (let chunk of input) {
 
             // While there is still input to process...
             while (chunk.length > 0) {
@@ -94,7 +94,7 @@ export function transformBytes(transformer) {
             }
         }
 
-    }()::skipFirst();
+    }()::skip();
 }
 
 

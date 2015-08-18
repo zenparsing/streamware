@@ -6,10 +6,8 @@ export function asyncIter() {
     if (this[Symbol.asyncIterator] !== void 0)
         return this[Symbol.asyncIterator]();
 
-    // TODO: replace _esdown reference
-
-    var iter = { [Symbol.asyncIterator]() { return this } },
-        inner = _esdown.iter(this);
+    let iter = { [Symbol.asyncIterator]() { return this } },
+        inner = this[Symbol.iterator]();
 
     ["next", "throw", "return"].forEach(name => {
 
@@ -21,10 +19,45 @@ export function asyncIter() {
 }
 
 
-// Skips over an iteration and returns the iterator
-export function skipFirst() {
+export async function observe(sink) {
 
-    this.next();
+    try {
+
+        for await (let value of this)
+            await sink.next(value);
+
+    } catch (x) {
+
+        if (!("throw" in sink))
+            throw x;
+
+        await sink.throw(x);
+
+    } finally {
+
+        if ("return" in sink)
+            await sink.return();
+    }
+}
+
+
+export function sink(fn) {
+
+    return function(...args) {
+
+        let iter = fn(...args);
+        iter.next();
+        return iter;
+    };
+}
+
+
+// Skips over a number of iterations and returns the iterator
+export function skip(count = 1) {
+
+    for (let i = 0; i < count; ++i)
+        this.next();
+
     return this;
 }
 
@@ -32,16 +65,16 @@ export function skipFirst() {
 // Returns an iterator which maps values from the input iterator
 export async function *map(fn) {
 
-    for async (let value of this)
-        yield await fn(value);
+    for await (let value of this)
+        yield fn(value);
 }
 
 
-// Returns an iterator which executes a callback for each value in the sequence
+// Executes a callback for each value in the sequence
 export async function forEach(fn) {
 
-    for async (let value of this)
-        await fn(val);
+    for await (let value of this)
+        await fn(value);
 }
 
 
@@ -165,7 +198,7 @@ export async function *slice(start = 0, stop = Infinity) {
     if (current >= stop)
         return;
 
-    for async (let chunk of this) {
+    for await (let chunk of this) {
 
         if (current >= start)
             yield chunk;
@@ -176,12 +209,46 @@ export async function *slice(start = 0, stop = Infinity) {
 }
 
 
-export async function *noClose() {
+export async function *takeUntil(iter) {
 
-    let iter = iterBase();
-    iter.next = val => this.next(val);
-    iter.throw = val => this.throw(val);
-    return iter;
+    iter = iter[Symbol.asyncIterator]();
+
+    let stream = this[Symbol.asyncIterator](),
+        done = false;
+
+    try {
+
+        while (true) {
+
+            let result = await Promise.race([
+                stream.next(),
+                iter.next().then(x => { done = true }),
+            ]);
+
+            let value = result.value;
+
+            if (done || result.done)
+                return value;
+            else
+                yield value;
+        }
+
+    } finally {
+
+        iter.return();
+        stream.return();
+    }
+}
+
+
+export async function collect() {
+
+    let list = [];
+
+    for await (let item of this)
+        list.push(item);
+
+    return list;
 }
 
 
@@ -231,7 +298,7 @@ export function sinkSource() {
         }
     }
 
-    let sink = producer()::skipFirst(),
+    let sink = producer()::skip(),
         source = consumer();
 
     return { sink, source };
@@ -242,7 +309,7 @@ export async function transfer(output) {
 
     try {
 
-        for async (let value of this)
+        for await (let value of this)
             await output.next(value);
 
     } finally {

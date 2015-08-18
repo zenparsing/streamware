@@ -2,7 +2,7 @@ export async function *fixedBytes(input, length) {
 
     let leftover = null;
 
-    for async (let chunk of input) {
+    for await (let chunk of input) {
 
         if (leftover) {
 

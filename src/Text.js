@@ -1,4 +1,4 @@
-import { skipFirst } from "./Tools.js";
+import { skip } from "./Tools.js";
 
 const DEFAULT_BUFFER_SIZE = 16 * 1024;
 
@@ -182,7 +182,7 @@ export function encodeText(encoding = "utf8") {
 
         let buffer = yield null;
 
-        for async (let text of input) {
+        for await (let text of input) {
 
             while (text) {
 
@@ -198,7 +198,7 @@ export function encodeText(encoding = "utf8") {
             }
         }
 
-    }()::skipFirst();
+    }()::skip();
 }
 
 
@@ -207,7 +207,7 @@ export async function *decodeText(encoding) {
     let decoder = new Decoder(encoding),
         text;
 
-    for async (let buffer of this) {
+    for await (let buffer of this) {
 
         text = decoder.decodeBuffer(buffer);
 
@@ -226,7 +226,7 @@ export async function concatText() {
 
     let out = "";
 
-    for async (let text of this)
+    for await (let text of this)
         out += text;
 
     return out;

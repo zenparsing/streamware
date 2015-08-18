@@ -88,7 +88,7 @@ async function *transform(input, inner) {
 
     let writeDone = write(input);
 
-    for async (let value of read(inner))
+    for await (let value of read(inner))
         yield value;
 
     await writeDone;
@@ -97,7 +97,7 @@ async function *transform(input, inner) {
 
 async function write(input, inner) {
 
-    async function wrap(fn) {
+    async function wrap(op, buffer) {
 
         let onError;
 
@@ -106,7 +106,9 @@ async function write(input, inner) {
             await new Promise((accept, reject) => {
 
                 inner.on("error", onError = reject);
-                fn(accept);
+
+                if (op === "write") inner.write(buffer, accept);
+                else inner.end(accept);
             });
 
         } finally {
@@ -115,10 +117,10 @@ async function write(input, inner) {
         }
     }
 
-    for async (let buffer of input)
-        await wrap(done => inner.write(buffer, done));
+    for await (let buffer of input)
+        await wrap("write", buffer);
 
-    await wrap(done => inner.end(done));
+    await wrap("end");
 }
 
 

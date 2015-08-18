@@ -18,22 +18,22 @@ export class Gate {
         this.map = new Map;
     }
 
-    wait(name) {
+    wait(name = "") {
 
         return gateEntry(this.map, name).promise;
     }
 
-    open(name, value) {
+    open(name = "", value = null) {
 
         gateEntry(this.map, name).accept(value);
     }
 
-    close(name) {
+    close(name = "") {
 
         this.map.delete(name);
     }
 
-    release(name, value) {
+    release(name = "", value = null) {
 
         let gate = this.map.get(name);
 
