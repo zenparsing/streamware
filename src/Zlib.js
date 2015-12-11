@@ -1,5 +1,5 @@
 import { transformBytes } from "./Binary.js";
-import { skip } from "./Tools.js";
+import { prime } from "./Tools.js";
 import { mutex } from "./Primatives.js";
 
 
@@ -83,7 +83,9 @@ class ZLib {
 }
 
 
-function zStream(input, mode, options) {
+function zStream(mode, options) {
+
+    let input = this;
 
     return async function*() {
 
@@ -107,41 +109,41 @@ function zStream(input, mode, options) {
 
         } finally { zlib.close() }
 
-    }()::skip();
+    }::prime();
 }
 
 
 export function deflate(options) {
 
-    return zStream(this, Z.DEFLATE, options);
+    return this::zStream(Z.DEFLATE, options);
 }
 
 
 export function deflateRaw(options) {
 
-    return zStream(this, Z.DEFLATERAW, options);
+    return this::zStream(Z.DEFLATERAW, options);
 }
 
 
 export function inflate(options) {
 
-    return zStream(this, Z.INFLATE, options);
+    return this::zStream(Z.INFLATE, options);
 }
 
 
 export function inflateRaw(options) {
 
-    return zStream(this, Z.INFLATERAW, options);
+    return this::zStream(Z.INFLATERAW, options);
 }
 
 
 export function gzip(options) {
 
-    return zStream(this, Z.GZIP, options);
+    return this::zStream(Z.GZIP, options);
 }
 
 
 export function gunzip(options) {
 
-    return zStream(this, Z.GUNZIP, options);
+    return this::zStream(Z.GUNZIP, options);
 }

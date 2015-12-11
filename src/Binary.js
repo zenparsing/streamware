@@ -1,5 +1,5 @@
 import { Gate } from "./Primatives.js";
-import { pump, skip, asyncIter } from "./Tools.js";
+import { pump, prime, asyncIter } from "./Tools.js";
 
 
 const DEFAULT_BUFFER_SIZE = 16 * 1024;
@@ -32,7 +32,7 @@ export function limitBytes(maxBytes) {
             // TODO: close input if yield throws
         }
 
-    }()::skip();
+    }::prime();
 }
 
 
@@ -94,7 +94,7 @@ export function transformBytes(transformer) {
             }
         }
 
-    }()::skip();
+    }::prime();
 }
 
 

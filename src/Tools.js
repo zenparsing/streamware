@@ -52,13 +52,30 @@ export function sink(fn) {
 }
 
 
-// Skips over a number of iterations and returns the iterator
-export function skip(count = 1) {
+// Primes an async generator function
+export function prime() {
 
-    for (let i = 0; i < count; ++i)
-        this.next();
+    let iter = this(),
+        primed = false;
 
-    return this;
+    return {
+
+        async next(value) {
+
+            if (!primed) {
+
+                primed = true;
+                await iter.next();
+            }
+
+            return iter.next(value);
+        },
+
+        throw(error) { return iter.throw(error) },
+        return(value) { return iter.return(value) },
+        [Symbol.asyncIterator]() { return this },
+
+    };
 }
 
 
@@ -211,9 +228,9 @@ export async function *slice(start = 0, stop = Infinity) {
 
 export async function *takeUntil(iter) {
 
-    iter = iter[Symbol.asyncIterator]();
+    iter = asyncIter(iter);
 
-    let stream = this[Symbol.asyncIterator](),
+    let stream = asyncIter(this),
         done = false;
 
     try {
@@ -298,7 +315,7 @@ export function sinkSource() {
         }
     }
 
-    let sink = producer()::skip(),
+    let sink = producer::prime(),
         source = consumer();
 
     return { sink, source };

@@ -1,4 +1,4 @@
-import { skip } from "./Tools.js";
+import { prime } from "./Tools.js";
 
 const DEFAULT_BUFFER_SIZE = 16 * 1024;
 
@@ -198,7 +198,7 @@ export function encodeText(encoding = "utf8") {
             }
         }
 
-    }()::skip();
+    }::prime();
 }
 
 
