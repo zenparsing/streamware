@@ -18,7 +18,7 @@ export function limitBytes(maxBytes) {
             if (!chunk)
                 chunk = new Buffer(DEFAULT_BUFFER_SIZE);
 
-            if (maxBytes < chunk.length)
+            if (chunk.length > maxBytes)
                 chunk = chunk.slice(0, maxBytes);
 
             let result = await input.next(chunk);
@@ -57,6 +57,10 @@ export function transformBytes(transformer) {
                 // Write to transformer
                 let [ read, written ] = await transformer.transform(chunk, output, offset, false);
 
+                // TODO: Is this correct?
+                if (read === 0 && written === 0)
+                    break;
+
                 chunk = chunk.slice(read);
                 offset += written;
 
@@ -77,6 +81,7 @@ export function transformBytes(transformer) {
 
             // Flush the transform buffer
             let [ read, written ] = await transformer.transform(emptyChunk, output, offset, true);
+
             offset += written;
 
             // If buffer has been completely flushed...

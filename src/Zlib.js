@@ -3,8 +3,7 @@ import { prime } from "./Tools.js";
 import { mutex } from "./Primatives.js";
 
 
-var Z = typeof process === "object" && process.binding("zlib");
-
+const Z = typeof process === "object" && process.binding("zlib");
 
 class ZLib {
 
@@ -65,11 +64,13 @@ class ZLib {
 
                 req.buffer = input;
 
-                req.callback = (inLeft, outLeft) => accept([
+                req.callback = (inLeft, outLeft) => {
 
-                    inLength - inLeft,
-                    outLength - outLeft,
-                ]);
+                    accept([
+                        inLength - inLeft,
+                        outLength - outLeft,
+                    ]);
+                };
 
             });
 
