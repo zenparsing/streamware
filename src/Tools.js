@@ -269,56 +269,68 @@ export async function collect() {
 }
 
 
-export function sinkSource() {
+export class Writer {
 
-    let gate = new Gate,
-        finished = false;
+    constructor(init) {
 
-    async function *producer() {
-
-        try {
-
-            while (!finished) {
-
-                gate.open("ready", yield);
-                await gate.wait("done");
-                gate.close("done");
-            }
-
-        } finally {
-
-            finished = true;
-            gate.open("ready");
-        }
+        this.gate = new Gate();
+        this.finished = false;
+        this.sink = this._sink();
+        this.completed = init(this._source());
     }
 
-    async function *consumer() {
+    write(data) {
+
+        return this.sink.next(data);
+    }
+
+    async close() {
+
+        await this.sink.return();
+        await this.completed;
+    }
+
+    async *_source() {
 
         try {
 
             while (true) {
 
-                let value = await gate.wait("ready");
-                gate.close("ready");
+                let value = await this.gate.wait("ready");
+                this.gate.close("ready");
 
-                if (finished)
+                if (this.finished)
                     break;
 
                 yield value;
-                gate.open("done");
+                this.gate.open("done");
             }
 
         } finally {
 
-            finished = true;
-            gate.open("done");
+            this.finished = true;
+            this.gate.open("done");
         }
     }
 
-    let sink = producer::prime(),
-        source = consumer();
+    async *_sink() {
 
-    return { sink, source };
+        try {
+
+            while (!this.finished) {
+
+                this.gate.open("ready", yield);
+                await this.gate.wait("done");
+                this.gate.close("done");
+            }
+
+        } finally {
+
+            this.finished = true;
+            this.gate.open("ready");
+        }
+    }
+
 }
 
 

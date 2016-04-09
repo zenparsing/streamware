@@ -1,35 +1,54 @@
-import { sinkSource } from "./Tools.js";
+function promiseCapability() {
 
+    x = {};
 
-function firstProp(...names) {
+    x.promise = new Promise((a, b) => {
+        x.resolve = a;
+        x.reject = b;
+    });
 
-    for (let name of names)
-        if (name in this)
-            return name;
-
-    return names[0];
+    return x;
 }
 
+export async function *observe(start) {
 
-export async function *listen(eventName) {
+    let next = promiseCapability(),
+        done = false;
 
-    let add = this::firstProp("addEventListener", "addListener"),
-        remove = this::firstProp("removeEventListener", "removeListener");
+    let stop = start(
+        x => { next.resolve(x); next = promiseCapability(); },
+        x => { next.reject(x); },
+        x => { next.resolve(x); done = true; });
 
-    let { sink, source } = sinkSource();
-
-    function push(event) { sink.next(event) }
-
-    this[add](eventName, push, false);
+    if (stop != null && typeof stop !== "function")
+        throw new TypeError(stop + " is not a function");
 
     try {
 
-        for await (let event of source)
-            yield event;
+        while (true) {
+
+            let value = await next.promise;
+
+            if (done) return value;
+            else yield value;
+        }
 
     } finally {
 
-        this[remove](push);
+        if (stop)
+            stop();
     }
 }
 
+export function listen(name, options = false) {
+
+    return observe(next => {
+
+        let add = this.addEventListener || this.addListener,
+            remove = this.removeEventListener || this.removeListener;
+
+        this::add(name, next, options);
+        return _=> this::remove(name, next, options);
+    });
+
+}

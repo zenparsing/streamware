@@ -124,7 +124,7 @@ async function write(input, inner) {
 }
 
 
-export function wrapNode(input, inner) {
+export function wrapNodeStream(input, inner) {
 
     return !inner ? read(input) :
         "read" in inner ? transform(input, inner) :
